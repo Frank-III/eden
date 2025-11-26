@@ -180,7 +180,7 @@ export namespace Treaty {
             | ((
                   path: string,
                   options: RequestInit
-              ) => RequestInit['headers'] | void)
+              ) => MaybePromise<RequestInit['headers'] | void>)
         >
         onRequest?: MaybeArray<
             (

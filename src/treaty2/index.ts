@@ -64,16 +64,16 @@ const createNewFile = (v: File) =>
               reader.readAsArrayBuffer(v)
           })
 
-const processHeaders = (
+const processHeaders = async (
     h: Treaty.Config['headers'],
     path: string,
     options: RequestInit = {},
     headers: Record<string, string> = {}
-): Record<string, string> => {
+): Promise<Record<string, string>> => {
     if (Array.isArray(h)) {
         for (const value of h)
             if (!Array.isArray(value))
-                headers = processHeaders(value, path, options, headers)
+                headers = await processHeaders(value, path, options, headers)
             else {
                 const key = value[0]
                 if (typeof key === 'string')
@@ -93,7 +93,7 @@ const processHeaders = (
             if (h instanceof Headers)
                 return processHeaders(h, path, options, headers)
 
-            const v = h(path, options)
+            const v = await h(path, options)
             if (v) return processHeaders(v, path, options, headers)
             return headers
 
@@ -204,8 +204,6 @@ const createProxy = (
                     method === 'head' ||
                     method === 'subscribe'
 
-                headers = processHeaders(headers, path, options)
-
                 const query = isGetOrHead
                     ? (body as Record<string, string | string[] | undefined>)
                           ?.query
@@ -260,6 +258,8 @@ const createProxy = (
                 }
 
                 return (async () => {
+                    headers = await processHeaders(headers, path, options)
+
                     let fetchInit = {
                         method: method?.toUpperCase(),
                         body,
@@ -269,12 +269,12 @@ const createProxy = (
 
                     fetchInit.headers = {
                         ...headers,
-                        ...processHeaders(
+                        ...(await processHeaders(
                             // For GET and HEAD, options is moved to body (1st param)
                             isGetOrHead ? body?.headers : options?.headers,
                             path,
                             fetchInit
-                        )
+                        ))
                     }
 
                     const fetchOpts =
@@ -301,11 +301,11 @@ const createProxy = (
                                     ...temp,
                                     headers: {
                                         ...fetchInit.headers,
-                                        ...processHeaders(
+                                        ...(await processHeaders(
                                             temp.headers,
                                             path,
                                             fetchInit
-                                        )
+                                        ))
                                     }
                                 }
                         }
@@ -396,11 +396,11 @@ const createProxy = (
                                     ...temp,
                                     headers: {
                                         ...fetchInit.headers,
-                                        ...processHeaders(
+                                        ...(await processHeaders(
                                             temp.headers,
                                             path,
                                             fetchInit
-                                        )
+                                        ))
                                     } as Record<string, string>
                                 }
                         }
