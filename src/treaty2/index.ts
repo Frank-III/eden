@@ -411,9 +411,22 @@ const createProxy = (
                             options?.headers['content-type']
 
                     const url = domain + path + q
-                    const response = await (elysia?.handle(
-                        new Request(url, fetchInit)
-                    ) ?? fetcher!(url, fetchInit))
+
+                    let response: Response
+
+                    try {
+                        response = await (elysia?.handle(
+                            new Request(url, fetchInit)
+                        ) ?? fetcher!(url, fetchInit))
+                    } catch (err) {
+                        return {
+                            data: null,
+                            error: new EdenFetchError(503, err),
+                            response: undefined,
+                            status: 503,
+                            headers: undefined
+                        }
+                    }
 
                     // @ts-ignore
                     let data = null

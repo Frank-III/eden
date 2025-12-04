@@ -98,10 +98,16 @@ export const edenFetch = <App extends Elysia<any, any, any, any, any, any, any>>
 			body: body as any
 		}
 
-		const execute = () =>
-			fetch(requestUrl, init).then((response) =>
-				handleResponse(response, execute)
-			)
+	const execute = () =>
+		fetch(requestUrl, init)
+			.then((response) => handleResponse(response, execute))
+			.catch((err) => ({
+				data: null,
+				error: new EdenFetchError(503, err),
+				status: 503,
+				headers: undefined,
+				retry: execute
+			}))
 
-		return execute()
-	}
+	return execute()
+}

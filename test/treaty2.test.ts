@@ -1,5 +1,6 @@
 import { Elysia, form, sse, t } from 'elysia'
 import { Treaty, treaty } from '../src'
+import { EdenFetchError } from '../src/errors'
 
 import { describe, expect, it, beforeAll, afterAll, mock, test } from 'bun:test'
 
@@ -657,6 +658,36 @@ describe('Treaty2', () => {
             client.id({ id: 'salty' }).get()
         ])
         expect(data.map((x) => x.data)).toEqual(['unknown', 'salty'])
+    })
+})
+
+describe('Treaty2 - Server offline', () => {
+    it('should return network error in error field when server is offline', async () => {
+        // Use a port where no server is running
+        const offlineClient = treaty<typeof app>('http://localhost:59999')
+
+        const { data, error, status } = await offlineClient.get()
+
+        expect(data).toBeNull()
+        expect(error).toBeInstanceOf(EdenFetchError)
+        expect(error?.status).toBe(503)
+        expect(status).toBe(503)
+        expect(error?.value).toBeInstanceOf(Error)
+    })
+
+    it('should return network error for POST requests when server is offline', async () => {
+        const offlineClient = treaty<typeof app>('http://localhost:59999')
+
+        const { data, error, status } = await offlineClient.mirror.post({
+            username: 'test',
+            password: 'test'
+        })
+
+        expect(data).toBeNull()
+        expect(error).toBeInstanceOf(EdenFetchError)
+        expect(error?.status).toBe(503)
+        expect(status).toBe(503)
+        expect(error?.value).toBeInstanceOf(Error)
     })
 })
 
