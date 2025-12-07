@@ -1,83 +1,188 @@
-import { treaty } from '@elysiajs/eden'
-import { describe, expect, it } from 'bun:test'
-import { Elysia, t } from 'elysia'
+import { describe, expect, it } from "bun:test";
+import { Elysia, file, form, t } from "elysia";
+import { treaty } from "../src";
 
-const productModel = t.Object({
-    name: t.String(),
-    variants: t.ArrayString(
-        t.Object({
-            price: t.Number({ minimum: 0 }),
-            weight: t.Number({ minimum: 0 })
-        })
-    ),
-    metadata: t.ObjectString({
-        category: t.String(),
-        tags: t.Array(t.String()),
-        inStock: t.Boolean()
-    }),
-    image: t.File({ type: 'image' })
-})
-type productModel = typeof productModel.static
+const postProductModel = t.Object({
+	name: t.String(),
+	variants: t.ArrayString(
+		t.Object({
+			price: t.Number({ minimum: 0 }),
+			weight: t.Number({ minimum: 0 }),
+		}),
+	),
+	metadata: t.ObjectString({
+		category: t.String(),
+		tags: t.Array(t.String()),
+		inStock: t.Boolean(),
+	}),
+	image: t.File({ type: "image" }),
+});
+type postProductModel = typeof postProductModel.static;
+
+const patchProductModel = t.Object({
+	name: t.Optional(t.String()),
+	variants: t.Optional(
+		t.ArrayString(
+			t.Object({
+				price: t.Number({ minimum: 0 }),
+				weight: t.Number({ minimum: 0 }),
+			}),
+		),
+	),
+	metadata: t.Optional(
+		t.ObjectString({
+			category: t.String(),
+			tags: t.Array(t.String()),
+			inStock: t.Boolean(),
+		}),
+	),
+	image: t.Optional(t.File({ type: "image" })),
+});
+type patchProductModel = typeof patchProductModel.static;
 
 const app = new Elysia()
-    .post('/product', ({ body, status }) => status("Created", body), { body: productModel })
+	.post("/product", async ({ body, status }) => status("Created", body), {
+		body: postProductModel,
+	})
+	.patch(
+		"/product/:id",
+		({ body, params }) => ({
+			id: params.id,
+			...body,
+		}),
+		{
+			body: patchProductModel,
+		},
+	);
 
-const api = treaty(app)
+const api = treaty(app);
 
-describe('Nested FormData with file(s) support', () => {
-    const filePath1 = `${import.meta.dir}/public/aris-yuzu.jpg`
+describe("Nested FormData with file(s) support", () => {
+	describe("Nested FormData with mandatory file (post operation)", async () => {
+		const filePath1 = `${import.meta.dir}/public/aris-yuzu.jpg`;
 
-    const testProduct: productModel = {
-        name: 'Test Product',
-        variants: [
-            {
-                price: 10,
-                weight: 100
-            },
-            {
-                price: 2.7,
-                weight: 32
-            }
-        ],
-        metadata: {
-            category: 'Electronics',
-            tags: ['new', 'featured', 'sale'],
-            inStock: true
-        },
-        image: Bun.file(filePath1)
-    }
+		const newProduct: postProductModel = {
+			name: "Test Product",
+			variants: [
+				{
+					price: 10,
+					weight: 100,
+				},
+				{
+					price: 2.7,
+					weight: 32,
+				},
+			],
+			metadata: {
+				category: "Electronics",
+				tags: ["new", "featured", "sale"],
+				inStock: true,
+			},
+			image: Bun.file(filePath1),
+		};
 
-    it('should create a product using manual JSON.stringify (old way)', async () => {
-        const stringifiedVariants = JSON.stringify(testProduct.variants)
-        const stringifiedMetadata = JSON.stringify(testProduct.metadata)
+		it("should create a product using manual JSON.stringify (old way)", async () => {
+			const stringifiedVariants = JSON.stringify(newProduct.variants);
+			const stringifiedMetadata = JSON.stringify(newProduct.metadata);
 
-        const { data, status } = await api.product.post({
-            name: testProduct.name,
-            variants: stringifiedVariants as unknown as {
-                price: number
-                weight: number
-            }[],
-            metadata: stringifiedMetadata as unknown as {
-                category: string
-                tags: string[]
-                inStock: boolean
-            },
-            image: testProduct.image
-        })
+			const { data, status } = await api.product.post({
+				name: newProduct.name,
+				variants: stringifiedVariants as unknown as {
+					price: number;
+					weight: number;
+				}[],
+				metadata: stringifiedMetadata as unknown as {
+					category: string;
+					tags: string[];
+					inStock: boolean;
+				},
+				image: newProduct.image,
+			});
 
-        expect(status).toBe(201)
-        expect(data).toEqual(testProduct)
-    })
+			expect(status).toBe(201);
+			expect(data).toEqual(newProduct);
+		});
 
-    it('should auto-stringify ArrayString and ObjectString fields (new way - improved DX)', async () => {
-        const { data, status } = await api.product.post({
-            name: testProduct.name,
-            variants: testProduct.variants, // No JSON.stringify needed!
-            metadata: testProduct.metadata, // No JSON.stringify needed!
-            image: testProduct.image
-        })
+		it("should auto-stringify ArrayString and ObjectString fields (new way - improved DX)", async () => {
+			const { data, status } = await api.product.post({
+				name: newProduct.name,
+				variants: newProduct.variants, // No JSON.stringify needed!
+				metadata: newProduct.metadata, // No JSON.stringify needed!
+				image: newProduct.image,
+			});
 
-        expect(status).toBe(201)
-        expect(data).toEqual(testProduct)
-    })
-})
+			expect(status).toBe(201);
+			expect(data).toEqual(newProduct);
+		});
+	});
+
+	describe("Nested FormData with optional file (patch operation)", () => {
+		const filePath2 = `${import.meta.dir}/public/midori.png`;
+
+		it("PATCH with file and omitted optional t.ObjectString", async () => {
+			const { data, error, status } = await api.product({ id: "123" }).patch({
+				name: "Updated Product",
+				image: Bun.file(filePath2),
+				// metadata and variants fields are omitted (should be OK since they're optional)
+			});
+
+			console.error(error);
+
+			expect(error).toBeNull();
+			expect(status).toBe(200);
+			expect(data).not.toBeNull();
+			expect(data?.name).toBe("Updated Product");
+			expect(data?.metadata).toBeUndefined();
+			expect(data?.variants).toBeUndefined();
+		});
+
+		it("PATCH with file and valid t.ObjectString and t.ArrayString data", async () => {
+			const { data, error, status } = await api.product({ id: "123" }).patch({
+				name: "Updated Product",
+				image: Bun.file(filePath2),
+				metadata: {
+					category: "Electronics",
+					tags: ["sale", "new"],
+					inStock: true,
+				},
+				variants: [
+					{
+						price: 15,
+						weight: 200,
+					},
+				],
+			});
+
+			expect(error).toBeNull();
+			expect(status).toBe(200);
+			expect(data).not.toBeNull();
+			expect(data?.name).toBe("Updated Product");
+			expect(data?.metadata).toEqual({
+				category: "Electronics",
+				tags: ["sale", "new"],
+				inStock: true,
+			});
+			expect(data?.variants).toEqual([
+				{
+					price: 15,
+					weight: 200,
+				},
+			]);
+		});
+
+		it("PATCH without file and omitted optional t.ObjectString", async () => {
+			const { data, error, status } = await api.product({ id: "123" }).patch({
+				name: "Updated Product",
+				// No file, no metadata, no variants - should work fine (no FormData mode)
+			});
+
+			expect(error).toBeNull();
+			expect(status).toBe(200);
+			expect(data).not.toBeNull();
+			expect(data?.name).toBe("Updated Product");
+			expect(data?.image).toBeUndefined();
+			expect(data?.metadata).toBeUndefined();
+			expect(data?.variants).toBeUndefined();
+		});
+	});
+});
