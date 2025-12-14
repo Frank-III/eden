@@ -1,8 +1,8 @@
-import Elysia, { t } from 'elysia'
-import { treaty } from '../src'
+import { Elysia, type MaybeArray, t } from 'elysia'
+import type { BunFile } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { expectTypeOf } from 'expect-type'
-import { BunFile } from 'bun'
+import { treaty } from '../src'
 
 const app = new Elysia()
     .post('/files', ({ body: { files } }) => files.map((file) => file.name), {
@@ -57,7 +57,7 @@ describe('Treaty2 - Using t.File() and t.Files() from server', async () => {
         type RouteFiles = client['files']['post']
 
         expectTypeOf<RouteFiles>().parameter(0).toEqualTypeOf<{
-            files: Array<File | BunFile> | File | BunFile
+            files: MaybeArray<File | BunFile>
         }>()
 
         type RouteFile = client['any']['file']['post']
@@ -80,7 +80,7 @@ describe('Treaty2 - Using t.File() and t.Files() from server', async () => {
 
         expect(files).not.toBeNull()
         expect(files).not.toBeUndefined()
-        expect(files).toEqual([bunFile1.name])
+        expect(files).toEqual([bunFile1.name] as string[])
 
         const { data: filesbis } = await client.files.post({
             files: [bunFile1]
@@ -88,7 +88,7 @@ describe('Treaty2 - Using t.File() and t.Files() from server', async () => {
 
         expect(filesbis).not.toBeNull()
         expect(filesbis).not.toBeUndefined()
-        expect(filesbis).toEqual([bunFile1.name])
+        expect(filesbis).toEqual([bunFile1.name] as string[])
 
         const { data: file } = await client.any.file.post({
             file: bunFile1
@@ -96,7 +96,7 @@ describe('Treaty2 - Using t.File() and t.Files() from server', async () => {
 
         expect(file).not.toBeNull()
         expect(file).not.toBeUndefined()
-        expect(file).toEqual(bunFile1.name)
+        expect(file).toEqual(bunFile1.name as string)
 
         const { data: pngFile } = await client.png.file.post({
             file: bunFile2
@@ -104,7 +104,7 @@ describe('Treaty2 - Using t.File() and t.Files() from server', async () => {
 
         expect(pngFile).not.toBeNull()
         expect(pngFile).not.toBeUndefined()
-        expect(pngFile).toEqual(bunFile2.name)
+        expect(pngFile).toEqual(bunFile2.name as string)
 
         const {
             data: notPngFile,
@@ -152,7 +152,7 @@ describe('Treaty2 - Using t.File() and t.Files() from server', async () => {
 
         expect(files).not.toBeNull()
         expect(files).not.toBeUndefined()
-        expect(files).toEqual([bunFile1.name, bunFile2.name, bunFile3.name])
+        expect(files).toEqual([bunFile1.name, bunFile2.name, bunFile3.name] as string[])
 
         const { data: filesbis } = await client.files.post({
             files: bunFilesForm.getAll('files') as File[]
@@ -160,7 +160,7 @@ describe('Treaty2 - Using t.File() and t.Files() from server', async () => {
 
         expect(filesbis).not.toBeNull()
         expect(filesbis).not.toBeUndefined()
-        expect(filesbis).toEqual([bunFile1.name, bunFile2.name, bunFile3.name])
+        expect(filesbis).toEqual([bunFile1.name, bunFile2.name, bunFile3.name] as string[])
     })
 
     it('accept an array of multiple regular file', async () => {

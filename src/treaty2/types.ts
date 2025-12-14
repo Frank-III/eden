@@ -59,7 +59,12 @@ type IsSuccessCode<S extends number> = S extends SuccessCodeRange ? true : false
 type MaybeArray<T> = T | T[]
 type MaybePromise<T> = T | Promise<T>
 
-type MaybeArrayFile<T> = T extends (File | BunFile)[] ? T | File | BunFile : T
+type MaybeArrayFile<T> =
+    T extends (File | BunFile)[]
+        ? (File | BunFile)[] | File | BunFile
+        : T extends File | BunFile
+          ? File | BunFile
+          : T
 
 type RelaxFileArrays<T> =
     T extends Record<string, unknown>

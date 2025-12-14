@@ -522,7 +522,7 @@ const createProxy = (
                             break
 
                         case 'multipart/form-data':
-                            const temp = await response.formData()
+                            const temp = await response.formData() as FormData
 
                             data = {}
                             temp.forEach((value, key) => {

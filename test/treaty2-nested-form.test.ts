@@ -1,16 +1,16 @@
 import { describe, expect, it } from "bun:test";
-import { Elysia, file, form, t } from "elysia";
+import { Elysia, t } from "elysia";
 import { treaty } from "../src";
 
 const postProductModel = t.Object({
 	name: t.String(),
-	variants: t.ArrayString(
+	variants: t.Array(
 		t.Object({
 			price: t.Number({ minimum: 0 }),
 			weight: t.Number({ minimum: 0 }),
 		}),
 	),
-	metadata: t.ObjectString({
+	metadata: t.Object({
 		category: t.String(),
 		tags: t.Array(t.String()),
 		inStock: t.Boolean(),
@@ -22,7 +22,7 @@ type postProductModel = typeof postProductModel.static;
 const patchProductModel = t.Object({
 	name: t.Optional(t.String()),
 	variants: t.Optional(
-		t.ArrayString(
+		t.Array(
 			t.Object({
 				price: t.Number({ minimum: 0 }),
 				weight: t.Number({ minimum: 0 }),
@@ -30,7 +30,7 @@ const patchProductModel = t.Object({
 		),
 	),
 	metadata: t.Optional(
-		t.ObjectString({
+		t.Object({
 			category: t.String(),
 			tags: t.Array(t.String()),
 			inStock: t.Boolean(),
@@ -38,7 +38,6 @@ const patchProductModel = t.Object({
 	),
 	image: t.Optional(t.File({ type: "image" })),
 });
-type patchProductModel = typeof patchProductModel.static;
 
 const app = new Elysia()
 	.post("/product", async ({ body, status }) => status("Created", body), {
@@ -60,6 +59,9 @@ const api = treaty(app);
 describe("Nested FormData with file(s) support", () => {
 	describe("Nested FormData with mandatory file (post operation)", async () => {
 		const filePath1 = `${import.meta.dir}/public/aris-yuzu.jpg`;
+		// @types/node related File is not compatible with Bun.File
+		// as unknown unneeded if you use only @types/bun
+		const file = Bun.file(filePath1) as unknown as File;
 
 		const newProduct: postProductModel = {
 			name: "Test Product",
@@ -78,7 +80,7 @@ describe("Nested FormData with file(s) support", () => {
 				tags: ["new", "featured", "sale"],
 				inStock: true,
 			},
-			image: Bun.file(filePath1),
+			image: file,
 		};
 
 		it("should create a product using manual JSON.stringify (old way)", async () => {
@@ -103,7 +105,7 @@ describe("Nested FormData with file(s) support", () => {
 			expect(data).toEqual(newProduct);
 		});
 
-		it("should auto-stringify ArrayString and ObjectString fields (new way - improved DX)", async () => {
+		it("should auto-stringify Array and Object fields (new way - improved DX)", async () => {
 			const { data, status } = await api.product.post({
 				name: newProduct.name,
 				variants: newProduct.variants, // No JSON.stringify needed!
@@ -119,7 +121,7 @@ describe("Nested FormData with file(s) support", () => {
 	describe("Nested FormData with optional file (patch operation)", () => {
 		const filePath2 = `${import.meta.dir}/public/midori.png`;
 
-		it("PATCH with file and omitted optional t.ObjectString", async () => {
+		it("PATCH with file and omitted optional t.Object", async () => {
 			const { data, error, status } = await api.product({ id: "123" }).patch({
 				name: "Updated Product",
 				image: Bun.file(filePath2),
@@ -136,7 +138,7 @@ describe("Nested FormData with file(s) support", () => {
 			expect(data?.variants).toBeUndefined();
 		});
 
-		it("PATCH with file and valid t.ObjectString and t.ArrayString data", async () => {
+		it("PATCH with file and valid t.Object and t.Array data", async () => {
 			const { data, error, status } = await api.product({ id: "123" }).patch({
 				name: "Updated Product",
 				image: Bun.file(filePath2),
@@ -170,7 +172,7 @@ describe("Nested FormData with file(s) support", () => {
 			]);
 		});
 
-		it("PATCH without file and omitted optional t.ObjectString", async () => {
+		it("PATCH without file and omitted optional t.Object", async () => {
 			const { data, error, status } = await api.product({ id: "123" }).patch({
 				name: "Updated Product",
 				// No file, no metadata, no variants - should work fine (no FormData mode)
