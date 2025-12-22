@@ -72,6 +72,15 @@ type RelaxFileArrays<T> =
               [K in keyof T]: MaybeArrayFile<T[K]>
           }
         : T
+type SerializeQueryParams<T> = T extends Record<string, any>
+  ? {
+      [K in keyof T]: T[K] extends Date
+        ? string
+        : T[K] extends Date | undefined
+          ? string | undefined
+          : T[K]
+    }
+  : T
 
 export namespace Treaty {
     interface TreatyParam {
@@ -91,7 +100,7 @@ export namespace Treaty {
             : K]: K extends 'subscribe' // ? Websocket route
             ? MaybeEmptyObject<Route['subscribe']['headers'], 'headers'> &
                   MaybeEmptyObject<
-                      Route['subscribe']['query'],
+                      SerializeQueryParams<Route['subscribe']['query']>,
                       'query'
                   > extends infer Param
                 ? (options?: Param) => EdenWS<Route['subscribe']>
@@ -104,7 +113,7 @@ export namespace Treaty {
                     response: infer Res extends Record<number, unknown>
                 }
               ? MaybeEmptyObject<Headers, 'headers'> &
-                    MaybeEmptyObject<Query, 'query'> extends infer Param
+                    MaybeEmptyObject<SerializeQueryParams<Query>, 'query'> extends infer Param
                   ? {} extends Param
                       ? undefined extends Body
                           ? K extends 'get' | 'head'
@@ -195,7 +204,7 @@ export namespace Treaty {
             | ((
                   path: string,
                   options: RequestInit
-              ) => RequestInit['headers'] | void)
+              ) => MaybePromise<RequestInit['headers'] | void>)
         >
         onRequest?: MaybeArray<
             (

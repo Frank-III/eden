@@ -1,5 +1,7 @@
 import { Elysia, form, sse, t } from 'elysia'
-import { treaty } from '../src'
+import { treaty, type Treaty } from '../src'
+import { EdenFetchError } from '../src/errors'
+import { streamResponse } from '../src/treaty2'
 
 import { describe, expect, it, beforeAll, afterAll, mock, test } from 'bun:test'
 
@@ -617,6 +619,37 @@ describe('Treaty2', () => {
         })
     })
 
+    it('accept async headers configuration', async () => {
+        const client = treaty(app, {
+            async headers(path) {
+                // Simulate async operation (e.g., fetching token)
+                await new Promise((r) => setTimeout(r, 10))
+                if (path === '/headers-custom')
+                    return {
+                        'x-custom': 'custom'
+                    }
+            },
+            async onResponse(response) {
+                return { intercepted: true, data: await response.json() }
+            }
+        })
+
+        const headers = { username: 'a', alias: 'Kristen' } as const
+
+        const { data } = await client['headers-custom'].get({
+            headers
+        })
+
+        expect(data).toEqual({
+            // @ts-expect-error
+            intercepted: true,
+            data: {
+                ...headers,
+                'x-custom': 'custom'
+            }
+        })
+    })
+
     it('accept headers configuration array', async () => {
         const client = treaty(app, {
             headers: [
@@ -702,6 +735,36 @@ describe('Treaty2', () => {
             client.id({ id: 'salty' }).get()
         ])
         expect(data.map((x) => x.data)).toEqual(['unknown', 'salty'])
+    })
+})
+
+describe('Treaty2 - Server offline', () => {
+    it('should return network error in error field when server is offline', async () => {
+        // Use a port where no server is running
+        const offlineClient = treaty<typeof app>('http://localhost:59999')
+
+        const { data, error, status } = await offlineClient.get()
+
+        expect(data).toBeNull()
+        expect(error).toBeInstanceOf(EdenFetchError)
+        expect(error?.status).toBe(503)
+        expect(status).toBe(503)
+        expect(error?.value).toBeInstanceOf(Error)
+    })
+
+    it('should return network error for POST requests when server is offline', async () => {
+        const offlineClient = treaty<typeof app>('http://localhost:59999')
+
+        const { data, error, status } = await offlineClient.mirror.post({
+            username: 'test',
+            password: 'test'
+        })
+
+        expect(data).toBeNull()
+        expect(error).toBeInstanceOf(EdenFetchError)
+        expect(error?.status).toBe(503)
+        expect(status).toBe(503)
+        expect(error?.value).toBeInstanceOf(Error)
     })
 })
 
@@ -971,6 +1034,301 @@ describe('Treaty2 - Using endpoint URL', () => {
         )
 
         expect(data).toBe('application/json!' as any)
+    })
+})
+
+function createChunkedSSEResponse(chunks: Array<string>): Response {
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+            for (const chunk of chunks) {
+                controller.enqueue(encoder.encode(chunk))
+            }
+            controller.close()
+        }
+    })
+
+    return new Response(stream, {
+        headers: { 'Content-Type': 'text/event-stream' }
+    })
+}
+
+describe('Treaty2 - SSE Chunk Splitting (fast streaming edge cases)', () => {
+    it('handles SSE event split across chunks (data: broken mid-line)', async () => {
+        const chunks = ['event: message\nda', 'ta: hello world\n\n']
+        const response = createChunkedSSEResponse(chunks)
+
+        const events: Array<unknown> = []
+        for await (const event of streamResponse(response)) {
+            events.push(event)
+        }
+
+        expect(events).toEqual([
+            { event: 'message', data: 'hello world' }
+        ])
+    })
+
+    it('handles SSE event split at newline boundary', async () => {
+        const chunks = ['event: start\ndata: hel', 'lo\n\nevent: end\ndata: world\n\n']
+        const response = createChunkedSSEResponse(chunks)
+
+        const events: Array<unknown> = []
+        for await (const event of streamResponse(response)) {
+            events.push(event)
+        }
+
+        expect(events).toEqual([
+            { event: 'start', data: 'hello' },
+            { event: 'end', data: 'world' }
+        ])
+    })
+
+    it('handles multiple complete events in single chunk', async () => {
+        const chunks = [
+            'event: a\ndata: 1\n\nevent: b\ndata: 2\n\nevent: c\ndata: 3\n\n'
+        ]
+        const response = createChunkedSSEResponse(chunks)
+
+        const events: Array<unknown> = []
+        for await (const event of streamResponse(response)) {
+            events.push(event)
+        }
+
+        expect(events).toEqual([
+            { event: 'a', data: 1 },
+            { event: 'b', data: 2 },
+            { event: 'c', data: 3 }
+        ])
+    })
+
+    it('handles event split across three chunks', async () => {
+        const chunks = [
+            'event: ',
+            'message\ndata: {"te',
+            'xt":"hello"}\n\n'
+        ]
+        const response = createChunkedSSEResponse(chunks)
+
+        const events: Array<unknown> = []
+        for await (const event of streamResponse(response)) {
+            events.push(event)
+        }
+
+        expect(events).toEqual([
+            { event: 'message', data: { text: 'hello' } }
+        ])
+    })
+
+    it('handles UTF-8 multibyte character split across chunks', async () => {
+        const fireEmoji = '🔥'
+        const fullData = `event: emoji\ndata: ${fireEmoji}\n\n`
+        const encoder = new TextEncoder()
+        const encoded = encoder.encode(fullData)
+
+        const emojiStart = fullData.indexOf(fireEmoji)
+        const bytePos = encoder.encode(fullData.slice(0, emojiStart)).length + 2
+
+        const chunk1 = encoded.slice(0, bytePos)
+        const chunk2 = encoded.slice(bytePos)
+
+        const stream = new ReadableStream<Uint8Array>({
+            async start(controller) {
+                controller.enqueue(chunk1)
+                controller.enqueue(chunk2)
+                controller.close()
+            }
+        })
+
+        const response = new Response(stream, {
+            headers: { 'Content-Type': 'text/event-stream' }
+        })
+
+        const events: Array<unknown> = []
+        for await (const event of streamResponse(response)) {
+            events.push(event)
+        }
+
+        expect(events).toEqual([{ event: 'emoji', data: fireEmoji }])
+    })
+
+    it('handles rapid streaming with many small chunks', async () => {
+        const fullSSE = 'event: fast\ndata: ok\n\n'
+        const chunks = fullSSE.split('')
+        const response = createChunkedSSEResponse(chunks)
+
+        const events: Array<unknown> = []
+        for await (const event of streamResponse(response)) {
+            events.push(event)
+        }
+
+        expect(events).toEqual([{ event: 'fast', data: 'ok' }])
+    })
+
+    it('handles incomplete event at end of stream (no trailing newlines)', async () => {
+        const chunks = ['event: final\ndata: incomplete']
+        const response = createChunkedSSEResponse(chunks)
+
+        const events: Array<unknown> = []
+        for await (const event of streamResponse(response)) {
+            events.push(event)
+        }
+
+        expect(events).toEqual([{ event: 'final', data: 'incomplete' }])
+    })
+
+    it('handles SSE with id field split across chunks', async () => {
+        const chunks = ['id: 123\nevent: ', 'update\ndata: test\n\n']
+        const response = createChunkedSSEResponse(chunks)
+
+        const events: Array<unknown> = []
+        for await (const event of streamResponse(response)) {
+            events.push(event)
+        }
+
+        expect(events).toEqual([
+            { id: 123, event: 'update', data: 'test' }
+        ])
+    })
+
+    it('handles mixed complete and split events', async () => {
+        const chunks = [
+            'event: first\ndata: 1\n\nevent: sec',
+            'ond\ndata: 2\n\nevent: third\ndata: 3\n\n'
+        ]
+        const response = createChunkedSSEResponse(chunks)
+
+        const events: Array<unknown> = []
+        for await (const event of streamResponse(response)) {
+            events.push(event)
+        }
+
+        expect(events).toEqual([
+            { event: 'first', data: 1 },
+            { event: 'second', data: 2 },
+            { event: 'third', data: 3 }
+        ])
+    })
+})
+
+describe('Treaty2 - Using t.File() and t.Files() from server', async () => {
+    const filePath1 = `${import.meta.dir}/public/aris-yuzu.jpg`
+    const filePath2 = `${import.meta.dir}/public/midori.png`
+    const filePath3 = `${import.meta.dir}/public/kyuukurarin.mp4`
+
+    const bunFile1 = Bun.file(filePath1)
+    const bunFile2 = Bun.file(filePath2)
+    const bunFile3 = Bun.file(filePath3)
+
+    const file1 = new File([await bunFile1.arrayBuffer()], 'cumin.webp', {
+        type: 'image/webp'
+    })
+    const file2 = new File([await bunFile2.arrayBuffer()], 'curcuma.jpg', {
+        type: 'image/jpeg'
+    })
+    const file3 = new File([await bunFile3.arrayBuffer()], 'kyuukurarin.mp4', {
+        type: 'video/mp4'
+    })
+
+    const filesForm = new FormData()
+    filesForm.append('files', file1)
+    filesForm.append('files', file2)
+    filesForm.append('files', file3)
+
+    const bunFilesForm = new FormData()
+    bunFilesForm.append('files', bunFile1)
+    bunFilesForm.append('files', bunFile2)
+    bunFilesForm.append('files', bunFile3)
+
+    it('accept a single Bun.file', async () => {
+        const { data: files } = await client.files.post({
+            files: bunFile1 as unknown as File[]
+        })
+
+        expect(files).not.toBeNull()
+        expect(files).not.toBeUndefined()
+        expect(files).toEqual([bunFile1.name!])
+
+        const { data: filesbis } = await client.files.post({
+            files: [bunFile1] as unknown as File[]
+        })
+
+        expect(filesbis).not.toBeNull()
+        expect(filesbis).not.toBeUndefined()
+        expect(filesbis).toEqual([bunFile1.name!])
+
+        const { data: file } = await client.file.post({
+            file: bunFile1 as unknown as File
+        })
+
+        expect(file).not.toBeNull()
+        expect(file).not.toBeUndefined()
+        expect(file).toEqual(bunFile1.name!)
+    })
+
+    it('accept a single regular file', async () => {
+        const { data: files } = await client.files.post({
+            files: file1 as unknown as File[]
+        })
+
+        expect(files).not.toBeNull()
+        expect(files).not.toBeUndefined()
+        expect(files).toEqual([file1.name!])
+
+        const { data: filesbis } = await client.files.post({
+            files: [file1] as unknown as File[]
+        })
+
+        expect(filesbis).not.toBeNull()
+        expect(filesbis).not.toBeUndefined()
+        expect(filesbis).toEqual([file1.name!])
+
+        const { data: file } = await client.file.post({
+            file: file1 as unknown as File
+        })
+
+        expect(file).not.toBeNull()
+        expect(file).not.toBeUndefined()
+        expect(file).toEqual(file1.name!)
+    })
+
+    it('accept an array of multiple Bun.file', async () => {
+        const { data: files } = await client.files.post({
+            files: [bunFile1, bunFile2, bunFile3] as unknown as File[]
+        })
+
+        expect(files).not.toBeNull()
+        expect(files).not.toBeUndefined()
+        expect(files).toEqual([bunFile1.name!, bunFile2.name!, bunFile3.name!])
+
+        const { data: filesbis } = await client.files.post({
+            files: bunFilesForm.getAll('files') as unknown as File[]
+        })
+
+        expect(filesbis).not.toBeNull()
+        expect(filesbis).not.toBeUndefined()
+        expect(filesbis).toEqual([
+            bunFile1.name!,
+            bunFile2.name!,
+            bunFile3.name!
+        ])
+    })
+
+    it('accept an array of multiple regular file', async () => {
+        const { data: files } = await client.files.post({
+            files: [file1, file2, file3] as unknown as File[]
+        })
+
+        expect(files).not.toBeNull()
+        expect(files).not.toBeUndefined()
+        expect(files).toEqual([file1.name!, file2.name!, file3.name!])
+
+        const { data: filesbis } = await client.files.post({
+            files: filesForm.getAll('files') as unknown as File[]
+        })
+
+        expect(filesbis).not.toBeNull()
+        expect(filesbis).not.toBeUndefined()
+        expect(filesbis).toEqual([file1.name!, file2.name!, file3.name!])
     })
 
     it('handle root dynamic parameter', async () => {
