@@ -25,9 +25,9 @@ const client = treaty(app)
 type client = typeof client
 
 describe('Treaty2 - Using t.File() and t.Files() from server', async () => {
-    const filePath1 = `${import.meta.dir}/public/aris-yuzu.jpg`
-    const filePath2 = `${import.meta.dir}/public/midori.png`
-    const filePath3 = `${import.meta.dir}/public/kyuukurarin.mp4`
+    const filePath1 = `test/public/aris-yuzu.jpg`
+    const filePath2 = `test/public/midori.png`
+    const filePath3 = `test/public/kyuukurarin.mp4`
 
     const bunFile1 = Bun.file(filePath1)
     const bunFile2 = Bun.file(filePath2)

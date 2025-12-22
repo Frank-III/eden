@@ -1,27 +1,36 @@
-import { Elysia, sse } from 'elysia'
+import { Elysia, t } from 'elysia'
 import { treaty } from '../src'
 
-export const app = new Elysia()
-    .get('/chunk', async function* () {
-        const chunks = ['chunk1', 'chunk2\n\nhello world']
-
-        for (const chunk of chunks)
-            yield sse({
-                event: 'data',
-                data: { text: chunk, attempt: 1 }
-            })
-
-        yield sse({
-            event: 'complete',
-            data: { message: 'done' }
+const app = new Elysia()
+    .post('/files', ({ body: { files } }) => files.map((file) => file.name), {
+        body: t.Object({
+            files: t.Files()
         })
     })
-    .listen(3000)
+    .post('/any/file', ({ body: { file } }) => file.name, {
+        body: t.Object({
+            file: t.File({ type: 'image/*' })
+        })
+    })
+    .post('/png/file', ({ body: { file } }) => file.name, {
+        body: t.Object({
+            file: t.File({ type: 'image/png' })
+        })
+    })
 
-const api = treaty<typeof app>('localhost:3000')
+const client = treaty(app)
+type client = typeof client
 
-const { data } = await api.chunk.get()
+const filePath1 = `test/public/aris-yuzu.jpg`
+const filePath2 = `test/public/midori.png`
+const filePath3 = `test/public/kyuukurarin.mp4`
 
-for await (const datum of data!) {
-    console.log(datum)
-}
+const bunFile1 = Bun.file(filePath1)
+const bunFile2 = Bun.file(filePath2)
+const bunFile3 = Bun.file(filePath3)
+
+const { data: files } = await client.files.post({
+    files: bunFile1
+})
+
+console.log(files)

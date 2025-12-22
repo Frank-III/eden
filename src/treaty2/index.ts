@@ -51,18 +51,18 @@ const createNewFile = (v: File) =>
     isServer
         ? v
         : new Promise<File>((resolve) => {
-            const reader = new FileReader()
+              const reader = new FileReader()
 
-            reader.onload = () => {
-                const file = new File([reader.result!], v.name, {
-                    lastModified: v.lastModified,
-                    type: v.type
-                })
-                resolve(file)
-            }
+              reader.onload = () => {
+                  const file = new File([reader.result!], v.name, {
+                      lastModified: v.lastModified,
+                      type: v.type
+                  })
+                  resolve(file)
+              }
 
-            reader.readAsArrayBuffer(v)
-        })
+              reader.readAsArrayBuffer(v)
+          })
 
 const processHeaders = async (
     h: Treaty.Config['headers'],
@@ -139,9 +139,9 @@ function parseSSEBlock(block: string): Record<string, unknown> | null {
  * Extracts complete SSE events from buffer, yielding parsed events.
  * Mutates bufferRef.value to remove consumed events.
  */
-function* extractEvents(
-    bufferRef: { value: string }
-): Generator<Record<string, unknown>> {
+function* extractEvents(bufferRef: {
+    value: string
+}): Generator<Record<string, unknown>> {
     let eventEnd: number
     while ((eventEnd = bufferRef.value.indexOf('\n\n')) !== -1) {
         const eventBlock = bufferRef.value.slice(0, eventEnd)
@@ -202,7 +202,7 @@ const createProxy = (
     paths: string[] = [],
     elysia?: Elysia<any, any, any, any, any, any>
 ): any =>
-    new Proxy(() => { }, {
+    new Proxy(() => {}, {
         get(_, param: string): any {
             return createProxy(
                 domain,
@@ -237,7 +237,7 @@ const createProxy = (
 
                 const query = isGetOrHead
                     ? (body as Record<string, string | string[] | undefined>)
-                        ?.query
+                          ?.query
                     : options?.query
 
                 let q = ''
@@ -275,12 +275,12 @@ const createProxy = (
                             domain.startsWith('https://')
                                 ? 'wss://'
                                 : domain.startsWith('http://')
+                                  ? 'ws://'
+                                  : locals.find((v) =>
+                                          (domain as string).includes(v)
+                                      )
                                     ? 'ws://'
-                                    : locals.find((v) =>
-                                        (domain as string).includes(v)
-                                    )
-                                        ? 'ws://'
-                                        : 'wss://'
+                                    : 'wss://'
                         ) +
                         path +
                         q
@@ -353,21 +353,22 @@ const createProxy = (
                             if (isFile(value)) return false
 
                             // Objects and Arrays should be stringified
-                            if (typeof value === 'object' && value !== null) {
-                                return true
+                            if (typeof value === 'object') {
+                                if (value !== null) return true
+                                if (value instanceof Date) return false
                             }
 
                             return false
                         }
 
-                        const prepareValue = async (value: any): Promise<any> => {
-                            if (value instanceof File) {
+                        const prepareValue = async (
+                            value: any
+                        ): Promise<any> => {
+                            if (value instanceof File)
                                 return await createNewFile(value)
-                            }
 
-                            if (shouldStringify(value)) {
+                            if (shouldStringify(value))
                                 return JSON.stringify(value)
-                            }
 
                             return value
                         }
@@ -453,13 +454,13 @@ const createProxy = (
                         // fetchInit.headers['content-type'] = 'multipart/form-data'
                         fetchInit.body = formData
                     } else if (typeof body === 'object') {
-                        ; (fetchInit.headers as Record<string, string>)[
+                        ;(fetchInit.headers as Record<string, string>)[
                             'content-type'
                         ] = 'application/json'
 
                         fetchInit.body = JSON.stringify(body)
                     } else if (body !== undefined && body !== null) {
-                        ; (fetchInit.headers as Record<string, string>)[
+                        ;(fetchInit.headers as Record<string, string>)[
                             'content-type'
                         ] = 'text/plain'
                     }
@@ -545,7 +546,7 @@ const createProxy = (
                     }
 
                     switch (
-                    response.headers.get('Content-Type')?.split(';')[0]
+                        response.headers.get('Content-Type')?.split(';')[0]
                     ) {
                         case 'text/event-stream':
                             data = streamResponse(response)
@@ -566,7 +567,7 @@ const createProxy = (
                             break
 
                         case 'multipart/form-data':
-                            const temp = await response.formData() as FormData
+                            const temp = (await response.formData()) as FormData
 
                             data = {}
                             temp.forEach((value, key) => {

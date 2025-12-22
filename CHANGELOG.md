@@ -1,3 +1,11 @@
+# 1.4.6 - 23 Dec 2025
+Bug fix:
+- [#235](https://github.com/elysiajs/eden/pull/235) SSE stream parser with partial chunks
+- [#234](https://github.com/elysiajs/eden/pull/234) Handle network errors in treaty and edenFetch
+- [#230](https://github.com/elysiajs/eden/pull/230) properly await async headers functions in treaty
+- [#229](https://github.com/elysiajs/eden/pull/229) auto-stringify ArrayString/ObjectString in FormData
+- [#227](https://github.com/elysiajs/eden/pull/227) correct type inference for t.Date() in query parameters
+
 # 1.4.5 - 13 Nov 2025
 Improvement:
 - export `EdenFetchError`
