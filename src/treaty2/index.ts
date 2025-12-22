@@ -51,18 +51,18 @@ const createNewFile = (v: File) =>
     isServer
         ? v
         : new Promise<File>((resolve) => {
-              const reader = new FileReader()
+            const reader = new FileReader()
 
-              reader.onload = () => {
-                  const file = new File([reader.result!], v.name, {
-                      lastModified: v.lastModified,
-                      type: v.type
-                  })
-                  resolve(file)
-              }
+            reader.onload = () => {
+                const file = new File([reader.result!], v.name, {
+                    lastModified: v.lastModified,
+                    type: v.type
+                })
+                resolve(file)
+            }
 
-              reader.readAsArrayBuffer(v)
-          })
+            reader.readAsArrayBuffer(v)
+        })
 
 const processHeaders = (
     h: Treaty.Config['headers'],
@@ -115,53 +115,84 @@ const processHeaders = (
     }
 }
 
+function parseSSEBlock(block: string): Record<string, unknown> | null {
+    const lines = block.split('\n')
+    const result: Record<string, unknown> = {}
+
+    for (const line of lines) {
+        if (!line || line.startsWith(':')) continue
+
+        const colonIndex = line.indexOf(':')
+        if (colonIndex > 0) {
+            const key = line.slice(0, colonIndex).trim()
+            // Per SSE spec, strip single leading space if present
+            const value = line.slice(colonIndex + 1).replace(/^ /, '')
+            // Preserve empty strings per SSE spec (e.g. "data:" with no value)
+            result[key] = value ? parseStringifiedValue(value) : value
+        }
+    }
+
+    return Object.keys(result).length > 0 ? result : null
+}
+
+/**
+ * Extracts complete SSE events from buffer, yielding parsed events.
+ * Mutates bufferRef.value to remove consumed events.
+ */
+function* extractEvents(
+    bufferRef: { value: string }
+): Generator<Record<string, unknown>> {
+    let eventEnd: number
+    while ((eventEnd = bufferRef.value.indexOf('\n\n')) !== -1) {
+        const eventBlock = bufferRef.value.slice(0, eventEnd)
+        bufferRef.value = bufferRef.value.slice(eventEnd + 2)
+
+        if (eventBlock.trim()) {
+            const parsed = parseSSEBlock(eventBlock)
+            if (parsed) yield parsed
+        }
+    }
+}
+
 export async function* streamResponse(response: Response) {
     const body = response.body
 
     if (!body) return
 
     const reader = body.getReader()
-    const decoder = new TextDecoder()
+    const decoder = new TextDecoder('utf-8')
+    const bufferRef = { value: '' }
 
     try {
         while (true) {
             const { done, value } = await reader.read()
             if (done) break
 
-            const data =
-                typeof value === 'string' ? value : decoder.decode(value)
+            const chunk =
+                typeof value === 'string'
+                    ? value
+                    : decoder.decode(value, { stream: true })
 
-            if (data.includes('\n\n')) yield* parseServerSentEvent(data)
-            else yield parseStringifiedValue(data)
+            bufferRef.value += chunk
+
+            yield* extractEvents(bufferRef)
+        }
+
+        const remaining = decoder.decode()
+        if (remaining) {
+            bufferRef.value += remaining
+        }
+
+        yield* extractEvents(bufferRef)
+
+        if (bufferRef.value.trim()) {
+            const parsed = parseSSEBlock(bufferRef.value)
+            if (parsed) {
+                yield parsed
+            }
         }
     } finally {
         reader.releaseLock()
-    }
-}
-
-function* parseServerSentEvent(data: string) {
-    const chunks = data.split('\n\n')
-
-    for (const chunk of chunks) {
-        if (chunk.indexOf(':') <= 0) {
-            if (chunk) yield parseStringifiedValue(chunk)
-            continue
-        }
-
-        const lines = chunk.split('\n')
-
-        const event: Record<string, string> = {}
-
-        for (const line of lines) {
-            const index = line.indexOf(':')
-            if (index > 0) {
-                const key = line.slice(0, index).trim()
-                const value = line.slice(index + 1).trim()
-                event[key] = parseStringifiedValue(value)
-            }
-        }
-
-        yield event
     }
 }
 
@@ -171,7 +202,7 @@ const createProxy = (
     paths: string[] = [],
     elysia?: Elysia<any, any, any, any, any, any>
 ): any =>
-    new Proxy(() => {}, {
+    new Proxy(() => { }, {
         get(_, param: string): any {
             return createProxy(
                 domain,
@@ -208,7 +239,7 @@ const createProxy = (
 
                 const query = isGetOrHead
                     ? (body as Record<string, string | string[] | undefined>)
-                          ?.query
+                        ?.query
                     : options?.query
 
                 let q = ''
@@ -246,12 +277,12 @@ const createProxy = (
                             domain.startsWith('https://')
                                 ? 'wss://'
                                 : domain.startsWith('http://')
-                                  ? 'ws://'
-                                  : locals.find((v) =>
-                                          (domain as string).includes(v)
-                                      )
                                     ? 'ws://'
-                                    : 'wss://'
+                                    : locals.find((v) =>
+                                        (domain as string).includes(v)
+                                    )
+                                        ? 'ws://'
+                                        : 'wss://'
                         ) +
                         path +
                         q
@@ -371,13 +402,13 @@ const createProxy = (
                         // fetchInit.headers['content-type'] = 'multipart/form-data'
                         fetchInit.body = formData
                     } else if (typeof body === 'object') {
-                        ;(fetchInit.headers as Record<string, string>)[
+                        ; (fetchInit.headers as Record<string, string>)[
                             'content-type'
                         ] = 'application/json'
 
                         fetchInit.body = JSON.stringify(body)
                     } else if (body !== undefined && body !== null) {
-                        ;(fetchInit.headers as Record<string, string>)[
+                        ; (fetchInit.headers as Record<string, string>)[
                             'content-type'
                         ] = 'text/plain'
                     }
@@ -450,7 +481,7 @@ const createProxy = (
                     }
 
                     switch (
-                        response.headers.get('Content-Type')?.split(';')[0]
+                    response.headers.get('Content-Type')?.split(';')[0]
                     ) {
                         case 'text/event-stream':
                             data = streamResponse(response)
