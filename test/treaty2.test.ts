@@ -574,6 +574,37 @@ describe('Treaty2', () => {
         })
     })
 
+    it('accept async headers configuration', async () => {
+        const client = treaty(app, {
+            async headers(path) {
+                // Simulate async operation (e.g., fetching token)
+                await new Promise((r) => setTimeout(r, 10))
+                if (path === '/headers-custom')
+                    return {
+                        'x-custom': 'custom'
+                    }
+            },
+            async onResponse(response) {
+                return { intercepted: true, data: await response.json() }
+            }
+        })
+
+        const headers = { username: 'a', alias: 'Kristen' } as const
+
+        const { data } = await client['headers-custom'].get({
+            headers
+        })
+
+        expect(data).toEqual({
+            // @ts-expect-error
+            intercepted: true,
+            data: {
+                ...headers,
+                'x-custom': 'custom'
+            }
+        })
+    })
+
     it('accept headers configuration array', async () => {
         const client = treaty(app, {
             headers: [
