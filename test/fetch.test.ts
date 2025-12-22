@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Elysia, form, t } from 'elysia'
 import { edenFetch } from '../src'
+import { EdenFetchError } from '../src/errors'
 
 import { describe, expect, it, beforeAll } from 'bun:test'
 
@@ -245,5 +246,37 @@ describe('Eden Fetch', () => {
         expect(data?.query.q).toBeUndefined()
         expect(error?.status).toBe(422)
         expect(error?.value.type).toBe("validation")
+    })
+})
+
+describe('Eden Fetch - Server offline', () => {
+    const offlineFetch = edenFetch<typeof app>('http://localhost:59999')
+    it('should return network error in error field when server is offline', async () => {
+        const { data, error, status } = await offlineFetch('', {})
+
+        expect(data).toBeNull()
+        expect(error).toBeInstanceOf(EdenFetchError)
+        expect(error?.status).toBe(503)
+        expect(status).toBe(503)
+        expect(error?.value).toBeInstanceOf(Error)
+    })
+
+    it('should return network error for POST requests when server is offline', async () => {
+        const { data, error, status } = await offlineFetch('', {
+            method: 'POST'
+        })
+
+        expect(data).toBeNull()
+        expect(error).toBeInstanceOf(EdenFetchError)
+        expect(error?.status).toBe(503)
+        expect(status).toBe(503)
+        expect(error?.value).toBeInstanceOf(Error)
+    })
+
+    it('should allow retry after network error', async () => {
+        const result = await offlineFetch('', {})
+
+        expect(result.error).toBeInstanceOf(EdenFetchError)
+        expect(typeof result.retry).toBe('function')
     })
 })
