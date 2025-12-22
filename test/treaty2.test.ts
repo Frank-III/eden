@@ -1,5 +1,5 @@
 import { Elysia, form, sse, t } from 'elysia'
-import { Treaty, treaty } from '../src'
+import { treaty, type Treaty } from '../src'
 import { EdenFetchError } from '../src/errors'
 import { streamResponse } from '../src/treaty2'
 
@@ -94,43 +94,98 @@ const app = new Elysia()
             alias: t.Literal('Kristen')
         })
     })
-    .group('/empty-test', (g) => g
-        .get('/with-maybe-empty', ({ query, headers }) => ({ query, headers }), {
-            query: t.MaybeEmpty(t.Object({ alias: t.String() })),
-            headers: t.MaybeEmpty(t.Object({ username: t.String() }))
-        })
-        .get('/with-unknown', ({ query, headers }) => ({ query, headers }), {
-            query: t.Unknown(),
-            headers: t.Unknown(),
-        })
-        .get('/with-empty-record', ({ query, headers }) => ({ query, headers }), {
-            query: t.Record(t.String(), t.Never()),
-            headers: t.Record(t.String(), t.Never()),
-        })
-        .get('/with-empty-obj', ({ query, headers }) => ({ query, headers }), {
-            query: t.Object({}),
-            headers: t.Object({}),
-        })
-        .get('/with-partial', ({ query, headers }) => ({ query, headers }), {
-            query: t.Partial(t.Object({ alias: t.String() })),
-            headers: t.Partial(t.Object({ username: t.String() })),
-        })
-        .get('/with-optional', ({ query, headers }) => ({ query, headers }), {
-            query: t.Optional(t.Object({ alias: t.String() })),
-            headers: t.Optional(t.Object({ username: t.String() })),
-        })
-        .get('/with-union-undefined', ({ query, headers }) => ({ query, headers }), {
-            query: t.Union([t.Object({ alias: t.String() }), t.Undefined()]),
-            headers: t.Union([t.Object({ username: t.String() }), t.Undefined()])
-        })
-        .get('/with-union-empty-obj', ({ query, headers }) => ({ query, headers }), {
-            query: t.Union([t.Object({ alias: t.String() }), t.Object({})]),
-            headers: t.Union([t.Object({ username: t.String() }), t.Object({})]),
-        })
-        .get('/with-union-empty-record', ({ query, headers }) => ({ query, headers }), {
-            query: t.Union([t.Object({ alias: t.String() }), t.Record(t.String(), t.Never())]),
-            headers: t.Union([t.Object({ username: t.String() }), t.Record(t.String(), t.Never())]),
-        })
+    .group('/empty-test', (g) =>
+        g
+            .get(
+                '/with-maybe-empty',
+                ({ query, headers }) => ({ query, headers }),
+                {
+                    query: t.MaybeEmpty(t.Object({ alias: t.String() })),
+                    headers: t.MaybeEmpty(t.Object({ username: t.String() }))
+                }
+            )
+            .get(
+                '/with-unknown',
+                ({ query, headers }) => ({ query, headers }),
+                {
+                    query: t.Unknown(),
+                    headers: t.Unknown()
+                }
+            )
+            .get(
+                '/with-empty-record',
+                ({ query, headers }) => ({ query, headers }),
+                {
+                    query: t.Record(t.String(), t.Never()),
+                    headers: t.Record(t.String(), t.Never())
+                }
+            )
+            .get(
+                '/with-empty-obj',
+                ({ query, headers }) => ({ query, headers }),
+                {
+                    query: t.Object({}),
+                    headers: t.Object({})
+                }
+            )
+            .get(
+                '/with-partial',
+                ({ query, headers }) => ({ query, headers }),
+                {
+                    query: t.Partial(t.Object({ alias: t.String() })),
+                    headers: t.Partial(t.Object({ username: t.String() }))
+                }
+            )
+            .get(
+                '/with-optional',
+                ({ query, headers }) => ({ query, headers }),
+                {
+                    query: t.Optional(t.Object({ alias: t.String() })),
+                    headers: t.Optional(t.Object({ username: t.String() }))
+                }
+            )
+            .get(
+                '/with-union-undefined',
+                ({ query, headers }) => ({ query, headers }),
+                {
+                    query: t.Union([
+                        t.Object({ alias: t.String() }),
+                        t.Undefined()
+                    ]),
+                    headers: t.Union([
+                        t.Object({ username: t.String() }),
+                        t.Undefined()
+                    ])
+                }
+            )
+            .get(
+                '/with-union-empty-obj',
+                ({ query, headers }) => ({ query, headers }),
+                {
+                    query: t.Union([
+                        t.Object({ alias: t.String() }),
+                        t.Object({})
+                    ]),
+                    headers: t.Union([
+                        t.Object({ username: t.String() }),
+                        t.Object({})
+                    ])
+                }
+            )
+            .get(
+                '/with-union-empty-record',
+                ({ query, headers }) => ({ query, headers }),
+                {
+                    query: t.Union([
+                        t.Object({ alias: t.String() }),
+                        t.Record(t.String(), t.Never())
+                    ]),
+                    headers: t.Union([
+                        t.Object({ username: t.String() }),
+                        t.Record(t.String(), t.Never())
+                    ])
+                }
+            )
     )
     .post('/queries', ({ query }) => query, {
         query: t.Object({
@@ -235,16 +290,6 @@ const app = new Elysia()
         return 'a'
     })
     .get('/id/:id?', ({ params: { id = 'unknown' } }) => id)
-    .post('/files', ({ body: { files } }) => files.map((file) => file.name), {
-        body: t.Object({
-            files: t.Files()
-        })
-    })
-    .post('/file', ({ body: { file } }) => file.name, {
-        body: t.Object({
-            file: t.File()
-        })
-    })
 
 const client = treaty(app)
 
@@ -400,7 +445,7 @@ describe('Treaty2', () => {
         'with-unknown',
         'with-empty-record',
         'with-union-empty-obj',
-        'with-union-empty-record',
+        'with-union-empty-record'
         // 'with-maybe-empty',
         // 'with-optional',
         // 'with-union-undefined',
