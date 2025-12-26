@@ -1,5 +1,5 @@
 {
-  "name": "@elysiajs/eden-tanstack-query",
+  "name": "eden-tanstack-query",
   "version": "0.0.1",
   "description": "TanStack Query integration for Eden Treaty",
   "type": "module",

@@ -1,4 +1,4 @@
-# @elysiajs/eden-tanstack-query
+# eden-tanstack-query
 
 A TanStack Query integration for [Eden Treaty](https://eden.ts), the type-safe client for [Elysia](https://elysiajs.com).
 
@@ -15,7 +15,7 @@ A TanStack Query integration for [Eden Treaty](https://eden.ts), the type-safe c
 ## Installation
 
 ```bash
-bun add @elysiajs/eden-tanstack-query @tanstack/query-core
+bun add eden-tanstack-query @tanstack/query-core
 ```
 
 ## Basic Usage
@@ -24,7 +24,7 @@ bun add @elysiajs/eden-tanstack-query @tanstack/query-core
 
 ```typescript
 import { treaty } from '@elysiajs/eden/treaty2'
-import { createEdenQuery } from '@elysiajs/eden-tanstack-query'
+import { createEdenQuery } from 'eden-tanstack-query'
 import { useQuery } from '@tanstack/svelte-query'
 
 // Your Elysia app type
