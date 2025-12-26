@@ -123,6 +123,23 @@ const eden = createEdenQuery<App>('http://localhost:8080', {
 })
 ```
 
+### Known Limitation: `onSuccess` Data Type
+
+When using `throwOnError: true`, errors are thrown before reaching `onSuccess`. However, TypeScript cannot narrow the data type at compile-time since `throwOnError` is a runtime configuration. This means the `data` parameter in `onSuccess` may still include error union types from your response schema.
+
+**Workaround**: Use the `vars` parameter instead of `data` when you only need input values (e.g., for cache invalidation):
+
+```typescript
+useMutation(eden.users.post.mutationOptions({
+  onSuccess: (_, vars) => {
+    // Use vars instead of data for invalidation
+    queryClient.invalidateQueries({
+      queryKey: eden.users({ id: vars.userId }).get.queryKey()
+    })
+  }
+}))
+```
+
 ## Advanced Usage
 
 ### Custom Eden Treaty Options
