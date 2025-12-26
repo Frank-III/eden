@@ -1,0 +1,42 @@
+{
+  "name": "@elysiajs/eden-tanstack-query",
+  "version": "0.0.1",
+  "description": "TanStack Query integration for Eden Treaty",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@elysiajs/eden": ">=1.0.0",
+    "@tanstack/query-core": "^5.0.0"
+  },
+  "devDependencies": {
+    "@elysiajs/eden": "file:../..",
+    "@tanstack/react-query": "^5.0.0",
+    "@tanstack/svelte-query": "^5.0.0",
+    "bun-types": "latest",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "elysia",
+    "eden",
+    "tanstack",
+    "query",
+    "react-query",
+    "svelte-query",
+    "typescript"
+  ]
+}
