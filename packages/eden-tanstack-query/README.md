@@ -91,19 +91,56 @@ const data = queryClient.getQueryData(eden.users.get.queryKey())
 
 ## Error Handling
 
-### Throw on Error (Default for most apps)
+### Global Error Handler
+
+Define error handling logic once when creating the client:
+
+```typescript
+import type { EdenErrorContext } from 'eden-tanstack-query'
+
+const eden = createEdenQuery<App>('http://localhost:8080', {
+  throwOnError: true,
+  onError: ({ error, path, method, type }: EdenErrorContext) => {
+    // Runs for ALL queries and mutations before throwing
+
+    if (error.status === 401) {
+      authStore.logout()
+      router.push('/login')
+    }
+
+    if (error.status === 403) {
+      toast.error('Not authorized')
+    }
+
+    if (error.status >= 500) {
+      toast.error('Server error, please try again')
+      logger.error('API Error', { path, method, error })
+    }
+  }
+})
+```
+
+The `EdenErrorContext` provides:
+- `error` - The `EdenFetchError` with status and value
+- `queryKey` - The generated query key
+- `method` - HTTP method ('get', 'post', etc.)
+- `path` - API path segments (['users', 'posts'])
+- `input` - The request input
+- `type` - Either 'query' or 'mutation'
+
+### Throw on Error (Default)
 
 ```typescript
 const eden = createEdenQuery<App>('http://localhost:8080', {
   throwOnError: true
 })
 
+// Per-query error handling (in addition to global handler)
 useQuery(eden.users.get.queryOptions(undefined, {
   onError: (error: EdenFetchError) => {
-    // error.status and error.value are available
-    // extra context is attached: error.queryKey, error.method, error.path, error.input
-    if (error.status === 401) {
-      router.push('/login')
+    // Runs after global handler, only for this query
+    if (error.status === 404) {
+      // Handle not found specifically for this query
     }
   }
 }))

@@ -32,9 +32,19 @@ export type EdenThrowOnError =
   | ((queryKey: readonly unknown[], status: number) => boolean)
   | ((context: EdenThrowOnErrorContext) => boolean)
 
+export interface EdenErrorContext {
+  error: import('@elysiajs/eden').EdenFetchError
+  queryKey: readonly unknown[]
+  method: HTTPMethod
+  path: string[]
+  input: unknown
+  type: 'query' | 'mutation'
+}
+
 export interface EdenQueryConfig {
   throwOnError?: boolean | EdenThrowOnError
   queryKeyPrefix?: string | string[]
+  onError?: (context: EdenErrorContext) => void
 }
 
 export interface EdenOptions<TEden = unknown> {

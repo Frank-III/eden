@@ -14,9 +14,10 @@ export function createEdenQuery<
   return extendProxy(
     treatyInstance,
     [],
-    { 
+    {
       throwOnError: options?.throwOnError ?? true,
-      queryKeyPrefix: options?.queryKeyPrefix 
+      queryKeyPrefix: options?.queryKeyPrefix,
+      onError: options?.onError
     }
   )
 }

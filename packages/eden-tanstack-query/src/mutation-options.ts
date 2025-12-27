@@ -109,6 +109,16 @@ export function createMutationOptions<
           ;(error as any).response = (result as any).response
           ;(error as any).headers = (result as any).headers
 
+          // Call global error handler
+          globalConfig.onError?.({
+            error,
+            queryKey: mutationKey,
+            method,
+            path: paths,
+            input: variables,
+            type: 'mutation'
+          })
+
           if (
             shouldThrowOnError(globalConfig, {
               queryKey: mutationKey,

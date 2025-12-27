@@ -107,6 +107,16 @@ export function createQueryOptions<
           ;(error as any).response = (result as any).response
           ;(error as any).headers = (result as any).headers
 
+          // Call global error handler
+          globalConfig.onError?.({
+            error,
+            queryKey,
+            method,
+            path: paths,
+            input: finalInput,
+            type: 'query'
+          })
+
           if (
             shouldThrowOnError(globalConfig, {
               queryKey,
