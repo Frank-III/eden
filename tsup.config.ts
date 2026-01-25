@@ -7,7 +7,8 @@ export default defineConfig({
         index: resolve(__dirname, 'src/index.ts'),
         treaty: resolve(__dirname, 'src/treaty/index.ts'),
         treaty2: resolve(__dirname, 'src/treaty2/index.ts'),
-        fetch: resolve(__dirname, 'src/fetch/index.ts')
+        fetch: resolve(__dirname, 'src/fetch/index.ts'),
+        'tanstack-query': resolve(__dirname, 'src/tanstack-query/index.ts')
     },
     format: ['cjs', 'esm', 'iife'],
     globalName: 'Eden',
